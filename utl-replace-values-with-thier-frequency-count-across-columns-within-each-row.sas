@@ -20,6 +20,15 @@ for a very fat PDV array. Maybe pagesize?
 The reason temp arrays are so fast is that they do not have to be mapped
 into the PDV, the elements are back to back?
 
+Also Barttosz makes a good point about an issue when counting
+  '000' in '000000000' see his note.
+
+However this is an issue outside of addr, peek. You need to know
+your data? Also I believe PRX does not have this issue?
+
+I tested Pauls code with 3000 'rb8' 0s and it worked.
+At 10,000 count only examined the first 32k.
+
 
 see hash solution and potential pitfals by
 Bartosz Jablonski
@@ -264,4 +273,33 @@ data want (drop = tx:) ;
 run ;
 
 
+* 3000 works;
 
+data have;
+  retain id;
+  array txs[*] tx1-tx3000;
+  do id=1 to 1;
+    do xcr=1 to 3000;
+       txs[xcr]=100;
+    end;
+    output;
+  end;
+  drop xcr;
+run;quit;
+
+
+data want  ;
+  set have ;
+  array tx TX1-TX3000 ;
+  array eq EQ1-EQ3000 ;
+  do over tx ;
+    eq = count (peekclong (addrlong (tx1), 8*3000), put (tx, rb8.)) ;
+  end ;
+  keep eq2996-eq3000;
+run ;
+
+Up to 40 obs WORK.WANT total obs=1
+
+Obs    EQ2996    EQ2997    EQ2998    EQ2999    EQ3000
+
+ 1      3000      3000      3000      3000      3000
