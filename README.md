@@ -1,5 +1,4 @@
 # utl-replace-values-with-thier-frequency-count-across-columns-within-each-row
-Replace values with thier frequency count across columns within each row
     Replace values with thier frequency count across columns within each row
 
     Deceptivley difficut if you are looking for an non brute force solution.
@@ -9,6 +8,35 @@ Replace values with thier frequency count across columns within each row
     WHICHN (in R and SAS)
     Summary IDGROUP
     HASH
+
+    see addr peek solution on end by
+    Paul Dorfman
+    sashole@bellsouth.net
+
+    UNDOCUMENTED? but I belive this is true.
+    A note but probably hot a issue for any reasonable SAS PDV.
+    Only temporary arrays have back to back elements.
+    However I believe the non-contiguous problem only arrises
+    for a very fat PDV array. Maybe pagesize?
+    The reason temp arrays are so fast is that they do not have to be mapped
+    into the PDV, the elements are back to back?
+
+    Also Barttosz makes a good point about an issue when counting
+      '000' in '000000000' see his note.
+
+    However this is an issue outside of addr, peek. You need to know
+    your data? Also I believe PRX does not have this issue?
+
+    I tested Pauls code with 3000 'rb8' 0s and it worked.
+    At 10,000 count only examined the first 32k.
+
+
+    see hash solution and potential pitfals by
+    Bartosz Jablonski
+    yabwon@gmail.com
+    https://listserv.uga.edu/cgi-bin/wa?A2=SAS-L;4ef2dac4.1811c
+    (solution not on the end)
+
 
     There may be an IML solution using sortndx to get indexes of equal value elements
 
@@ -93,9 +121,7 @@ Replace values with thier frequency count across columns within each row
 
     /*
     WORK.HAVVUE total obs=25
-
      ID    VAR    VAL
-
       1    TX1    100
       1    TX2    103
       1    TX3      .
@@ -126,9 +152,7 @@ Replace values with thier frequency count across columns within each row
 
     /*
      WANTSQLXPO total obs=5
-
       ID    TX1    TX2    TX3    TX4    TX5
-
        1     3      1      1      3      3
        2     1      1      1      1      1
        3     1      2      2      2      2
@@ -157,9 +181,7 @@ Replace values with thier frequency count across columns within each row
 
     /*
      WORK.HAVSRT total obs=25
-
       ID    VAR    VAL
-
        1    TX3      .
        1    TX4    100
        1    TX5    100
@@ -188,9 +210,7 @@ Replace values with thier frequency count across columns within each row
 
     /*
      WORK.HAVROL total obs=5
-
       ID    EQ1    EQ2    EQ3    EQ4    EQ5    VAR    VAL    CNT    IDX
-
        1     3      1      1      3      3     TX2    103     1      2
        2     1      1      1      1      1     TX3    103     1      3
        3     1      2      2      2      2     TX1    102     1      1
@@ -203,7 +223,6 @@ Replace values with thier frequency count across columns within each row
     | '_ ` _ \ / _` | |/ / _ \   / _` |/ _` | __/ _` |
     | | | | | | (_| |   <  __/  | (_| | (_| | || (_| |
     |_| |_| |_|\__,_|_|\_\___|   \__,_|\__,_|\__\__,_|
-
     ;
 
 
@@ -221,4 +240,67 @@ Replace values with thier frequency count across columns within each row
     run;quit;
 
 
+    *____             _
+    |  _ \ __ _ _   _| |
+    | |_) / _` | | | | |
+    |  __/ (_| | |_| | |
+    |_|   \__,_|\__,_|_|
 
+    ;
+
+    The array becomes a single binary string and we plug
+    the frequency into the correct slot.
+
+    This is very powerful, the string is only limited by
+    available memory, however the count function is limited to 32k?
+
+    data have ;
+      input ID TX1-TX5 ;
+      cards ;
+    1 100 103   . 100 100
+    2   . 102 103 100 101
+    3 102 100   .   . 100
+    4 102 101   . 103   .
+    5   . 102 100 100 101
+    run ;
+
+    data want (drop = tx:) ;
+      set have ;
+      array tx TX1-TX5 ;
+      array eq EQ1-EQ5 ;
+      do over tx ;
+        eq = count (peekclong (addrlong (tx1), 8*5), put (tx, rb8.)) ;
+      end ;
+    run ;
+
+
+    * 3000 works;
+
+    data have;
+      retain id;
+      array txs[*] tx1-tx3000;
+      do id=1 to 1;
+        do xcr=1 to 3000;
+           txs[xcr]=100;
+        end;
+        output;
+      end;
+      drop xcr;
+    run;quit;
+
+
+    data want  ;
+      set have ;
+      array tx TX1-TX3000 ;
+      array eq EQ1-EQ3000 ;
+      do over tx ;
+        eq = count (peekclong (addrlong (tx1), 8*3000), put (tx, rb8.)) ;
+      end ;
+      keep eq2996-eq3000;
+    run ;
+
+    Up to 40 obs WORK.WANT total obs=1
+
+    Obs    EQ2996    EQ2997    EQ2998    EQ2999    EQ3000
+
+     1      3000      3000      3000      3000      3000
